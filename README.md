@@ -62,8 +62,6 @@ https://github.com/eth-cscs/stackinator/tree/523aa8edcb986dea3f62f7f53c168008466
 Example output:
 ```
 └── srun -n2 -N2 --partition=cpu osu_bw
-slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11.3.0/cray-mpich-8.1.25-n3377d4kyhi6zu46ehim2xk27wmzqqc7/lib': No such file or directory: going to /tmp instead
-slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11.3.0/cray-mpich-8.1.25-n3377d4kyhi6zu46ehim2xk27wmzqqc7/lib': No such file or directory: going to /tmp instead
 # OSU MPI Bandwidth Test v5.9
 # Size      Bandwidth (MB/s)
 1                       2.05
