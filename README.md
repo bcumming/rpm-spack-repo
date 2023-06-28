@@ -93,7 +93,7 @@ Example output:
 
 ## Direct From RPM
 
-In step 1 we followed manually repackaged the contents of the RPMs as tar balls.
+In step 1 we manually repackaged the contents of the RPMs as tar balls.
 
 We then investigated using the RPM directly for the `cray-pmi` package.
 
@@ -146,7 +146,7 @@ One option that we floated was creating a Spack package type for CrayRPM, simila
 
 ## NOTES
 
-Running libtree on the generated binaries shows that dependencies like numactl and curl are pulled in from the system, i.e. locations like `/usr/lib64`.
+Running libtree on the generated binaries shows that dependencies like hwloc and curl are pulled in from the system, i.e. locations like `/usr/lib64`.
 This is expected because these are not explicit dependencies of the spack packages that we have created for `cray-pmi`, `cray-gtl` and `cray-mpich`.
 We could explicitly add these as requirements, and have.
 
@@ -161,7 +161,4 @@ libdir=${prefix}/lib
 ```
 
 However, there is no `includedir`, and no headers, so this configuration isn't useful.
-Though this probably isn't important, because the package is only intended to provide the libraries used by cray-mpich, which has alreadybeen compiled, so we don't include or patch the pkgconfig files.
-
-
-Results:
+Though this probably isn't important, because the package is only intended to provide the libraries used by cray-mpich, which has already been compiled, so we don't include or patch the pkgconfig files.
