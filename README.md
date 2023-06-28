@@ -77,17 +77,34 @@ Though this probably isn't important, because the package is only intended to pr
  -   gpd5wtx          ^patchelf@0.17.2%gcc@11.3.0 build_system=autotools arch=linux-sles15-zen2
 ```
 
-## Test program for PMI
-
-Not needed if we demonstrate.
+Results:
 ```
-#include <pmi.h>
-
-int main() {
-    int flags;
-    int result = 0;
-    result += PMI_Init(&flags);
-    result += PMI_Finalize();
-    return result;
-}
+└── srun -n2 -N2 --partition=cpu osu_bw
+slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11.3.0/cray-mpich-8.1.25-n3377d4kyhi6zu46ehim2xk27wmzqqc7/lib': No such file or directory: going to /tmp instead
+slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11.3.0/cray-mpich-8.1.25-n3377d4kyhi6zu46ehim2xk27wmzqqc7/lib': No such file or directory: going to /tmp instead
+# OSU MPI Bandwidth Test v5.9
+# Size      Bandwidth (MB/s)
+1                       2.05
+2                       4.07
+4                       8.60
+8                      17.15
+16                     34.65
+32                     69.44
+64                    139.06
+128                   263.36
+256                   493.64
+512                  1051.25
+1024                 2097.47
+2048                 4196.75
+4096                 8326.25
+8192                16320.55
+16384               19975.33
+32768               19271.78
+65536               21507.91
+131072              22239.16
+262144              22489.53
+524288              22707.80
+1048576             22771.54
+2097152             22803.64
+4194304             23286.54
 ```
