@@ -1,17 +1,16 @@
-CSCS artifactory: https://nexus.cmn.alps.cscs.ch/service/rest/repository/browse/cpe-23.03-sles15-sp3/
-
-Use the following RPMs:
-- `cray-mpich-8.1.25-gtl-0-17.sles15sp3.x86_64.rpm`
-- `cray-mpich-8.1.25-gnu91-0-17.sles15sp3.x86_64.rpm`
-- `cray-pmi-6.1.10-0-12.sles15sp3.x86_64.rpm`
-
-
 ## Plan
 
-Target the following versions, only for gcc, in the following order
+The first step is to split the `cray-mpich` Spack package that bundled `cray-mpich`, `cray-pmi` and `cray-mpich-gtl` into a single tar ball into individual spack packages that correspond 1-1 with the RPMs distributed by HPE.
+
+We targetted the following versions, only for gcc, in the following order:
 - cray-pmi@6.1.10
+    - `cray-pmi-6.1.10-0-12.sles15sp3.x86_64.rpm`
 - cray-gtl@8.1.25
+    - `cray-mpich-8.1.25-gtl-0-17.sles15sp3.x86_64.rpm`
 - cray-mpich@8.1.25
+    - `cray-mpich-8.1.25-gnu91-0-17.sles15sp3.x86_64.rpm`
+
+The basic dependency tree between the packages is:
 
 ```
 libfabric           cuda
@@ -22,38 +21,18 @@ libfabric           cuda
         cray-mpich
 ```
 
-## NOTES
+Where `cray-gtl` is an optional dependency, used if the `cray-mpich` package requests the `+cuda` variant.
 
-Running libtree on the generated binaries shows that dependencies like numactl and curl are pulled in from the system, i.e. locations like `/usr/lib64`.
-This is expected because these are not explicit dependencies of the spack packages that we have created for `cray-pmi`, `cray-gtl` and `cray-mpich`.
-We could explicitly add these as requirements, and have.
+This was relatively straightfoward, with the following issues hit:
+- if a tar ball contains a single sub-directory (`/lib` in our case), the contents of that sub-directory are placed directly in the installatin prefix.
+- because we are installing `cray-gtl` in its own prefix (as opposed to the `cray-mpich` prefix), the MPI wrappers `mpicc` etc. have to be patched to include `-L{self.spec['cray-gtl'].prefix.lib}`.
 
-### RPMs
+With this approach, we were able to build and run `osu-micro-benchmarks` Spack package using cray-mpich on the CSCS *hohgant* system.
 
-From the interwebs:
-```
-# nodep
-rpm -ivh --nodeps foo.rpm
+See the stackinator tool for the Spack repo with the three configurations:
+https://github.com/eth-cscs/stackinator/tree/523aa8edcb986dea3f62f7f53c168008466f234e/stackinator/repo
 
-# in a different prefix
-rpm -ivh --prefix=/opt foo.rpm
-```
-
-in Spack, the prefix is: `self.spec.prefix`
-
-### cray-mpich-gtl
-
-the cray-mpich-gtl rpm contains only `lib` path with the gtl libraries, and a `lib/pkgconfig` path with `cray-gtl-cuda.pc`  and `cray-gtl-hsa.pc`.
-These contain:
-```
-prefix=/opt/cray/pe/mpich/8.1.25/gtl
-includedir=${prefix}/include
-libdir=${prefix}/lib
-```
-
-However, there is no `includedir`, and no headers, so this configuration isn't useful.
-Though this probably isn't important, because the package is only intended to provide the libraries used by cray-mpich, which has alreadybeen compiled, so we don't include or patch the pkgconfig files.
-
+**concretisation when cray-mpich is configured by default (no cuda/rocm)**
 ```
 ==> Concretized osu-micro-benchmarks@5.9
  -   w6hnwwt  osu-micro-benchmarks@5.9%gcc@11.3.0~cuda~graphing~papi~rocm build_system=autotools arch=linux-sles15-zen2
@@ -61,7 +40,10 @@ Though this probably isn't important, because the package is only intended to pr
  -   k5yopnf          ^cray-pmi@6.1.10%gcc@11.3.0 build_system=generic arch=linux-sles15-zen2
  -   5dkqgq3          ^libfabric@1.15.2.0%gcc@11.3.0~debug~kdreg build_system=autotools fabrics=sockets,tcp,udp arch=linux-sles15-zen2
  -   gpd5wtx          ^patchelf@0.17.2%gcc@11.3.0 build_system=autotools arch=linux-sles15-zen2
+```
 
+**concretisation for `cray-mpich +cuda`**
+```
 ==> Concretized osu-micro-benchmarks@5.9
  -   smjat45  osu-micro-benchmarks@5.9%gcc@11.3.0~cuda~graphing~papi~rocm build_system=autotools arch=linux-sles15-zen2
  -   gcroh6n      ^cray-mpich@8.1.25%gcc@11.3.0+cuda~rocm build_system=generic arch=linux-sles15-zen2
@@ -77,7 +59,7 @@ Though this probably isn't important, because the package is only intended to pr
  -   gpd5wtx          ^patchelf@0.17.2%gcc@11.3.0 build_system=autotools arch=linux-sles15-zen2
 ```
 
-Results:
+Example output:
 ```
 └── srun -n2 -N2 --partition=cpu osu_bw
 slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11.3.0/cray-mpich-8.1.25-n3377d4kyhi6zu46ehim2xk27wmzqqc7/lib': No such file or directory: going to /tmp instead
@@ -108,3 +90,78 @@ slurmstepd: error: couldn't chdir to `/user-environment/linux-sles15-zen2/gcc-11
 2097152             22803.64
 4194304             23286.54
 ```
+
+## Direct From RPM
+
+In step 1 we followed manually repackaged the contents of the RPMs as tar balls.
+
+We then investigated using the RPM directly for the `cray-pmi` package.
+
+After some trial and error we arrived at the following in our `package.py`:
+see https://github.com/eth-cscs/stackinator/blob/stackify-cray/stackinator/repo/packages/cray-pmi/package.py for the full package.
+
+```python
+    def install(self, spec, prefix):
+        rpm_path = self.stage.archive_file
+        tmp_path = self.stage.source_path
+
+        args = [
+            "rpm",
+            "-ivh",
+            "--relocate",
+            f"/opt/cray/pe={prefix}",
+            "--relocate",
+            f"/opt/cray/pe/pmi/6.1.10={prefix}",
+            "--nodeps",
+            "--badreloc",
+            "--dbpath",
+            f"{tmp_path}",
+            f"{rpm_path}"
+        ]
+
+        subprocess.run(args)
+```
+
+The stack was rebuilt and validated with the OSU benchmark.
+
+We stopped here, because we had the proof of concept, and doing the same for the other two packages would be an exercise in box ticking.
+
+### todo and thoughts
+
+The RPM installer can be modified to make installation of just the components that we care about
+
+The following information should be provided to the RPM installer:
+
+**for compiler wrappers**
+- prefix of C, C++ and Fortran compilers
+- whether GTL is required, which flavour (CUDA or HSA) and the `prefix.lib` path where the library is located.
+
+**for rpaths**
+- a list of rpaths to patch
+- optionally, we could leave rpath patching to the spack package - more thought is needed to find the best approach there.
+
+One option that we floated was creating a Spack package type for CrayRPM, similar to CMake, Meson and Python package types. This could automatically perform the rpath conversion, and the interface with the RPM installation.
+
+**SUMMARY FINISHES HERE**
+
+## NOTES
+
+Running libtree on the generated binaries shows that dependencies like numactl and curl are pulled in from the system, i.e. locations like `/usr/lib64`.
+This is expected because these are not explicit dependencies of the spack packages that we have created for `cray-pmi`, `cray-gtl` and `cray-mpich`.
+We could explicitly add these as requirements, and have.
+
+### cray-mpich-gtl
+
+the cray-mpich-gtl rpm contains only `lib` path with the gtl libraries, and a `lib/pkgconfig` path with `cray-gtl-cuda.pc`  and `cray-gtl-hsa.pc`.
+These contain:
+```
+prefix=/opt/cray/pe/mpich/8.1.25/gtl
+includedir=${prefix}/include
+libdir=${prefix}/lib
+```
+
+However, there is no `includedir`, and no headers, so this configuration isn't useful.
+Though this probably isn't important, because the package is only intended to provide the libraries used by cray-mpich, which has alreadybeen compiled, so we don't include or patch the pkgconfig files.
+
+
+Results:
