@@ -1,6 +1,8 @@
 ## Plan
 
 The first step is to split the `cray-mpich` Spack package that bundled `cray-mpich`, `cray-pmi` and `cray-mpich-gtl` into a single tar ball into individual spack packages that correspond 1-1 with the RPMs distributed by HPE.
+- because existing processes
+- because chain of trust
 
 We targetted the following versions, only for gcc, in the following order:
 - cray-pmi@6.1.10
