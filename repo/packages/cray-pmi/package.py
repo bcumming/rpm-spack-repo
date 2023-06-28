@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 import os
+import subprocess
 
 import spack.compilers
 from spack.package import *
@@ -15,13 +16,14 @@ class CrayPmi(Package):
     """Intended to override the main cray-pmi"""
 
     homepage = "https://www.hpe.com/us/en/compute/hpc/hpc-software.html"
-    url = "file:///scratch/e1000/bcumming/hpe-hackathon/cray-pmi-6.1.10.tar.gz"
+    url = "file:///scratch/e1000/bcumming/hpe-hackathon/rpms/cray-pmi-6.1.10-0-12.sles15sp3.x86_64.rpm"
     maintainers = ["bcumming"]
 
     version(
         "6.1.10",
-        sha256="537e0b924423b9a217ff260a2ba3f3446d696aacb605a7c2f30d0defcbc0ed9f",
-        url="file:///scratch/e1000/bcumming/hpe-hackathon/cray-pmi-6.1.10.tar.gz",
+        sha256="c5ea2253b28dc67b49295fc4208c6126548cd6dc384dc6b8724729f9fa49f7c6",
+        expand=False,
+        url="file:///scratch/e1000/bcumming/hpe-hackathon/rpms/cray-pmi-6.1.10-0-12.sles15sp3.x86_64.rpm",
     )
 
     # Fix up binaries with patchelf.
@@ -45,7 +47,30 @@ class CrayPmi(Package):
             return False
 
     def install(self, spec, prefix):
-        install_tree(".", prefix)
+        #install_tree(".", prefix)
+
+        rpm_path = self.stage.archive_file
+        tmp_path = self.stage.source_path
+
+        print("==== XXXX rpm_path", rpm_path)
+        print("==== XXXX tmp_path", tmp_path)
+        print("==== XXXX prefix", prefix)
+
+        args = [
+            "rpm",
+            "-ivh",
+            "--relocate",
+            f"/opt/cray/pe={prefix}",
+            "--relocate",
+            f"/opt/cray/pe/pmi/6.1.10={prefix}",
+            "--nodeps",
+            "--badreloc",
+            "--dbpath",
+            f"{tmp_path}",
+            f"{rpm_path}"
+        ]
+
+        subprocess.run(args)
 
     @run_after("install")
     def fixup_binaries(self):
